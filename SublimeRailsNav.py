@@ -351,6 +351,53 @@ class ListRailsTestsCommand(RailsCommandBase):
         return os.path.join(self.root, self.test_type) in current_file and not self.FIXTURE_DIR in current_file
 
 
+class ListRailsFeaturesCommand(RailsCommandBase):
+    def run(self):
+        if not self.setup():
+            return
+
+        self.show_files([['features']], '\.feature' )
+
+    def construct_related_file_name_pattern(self, current_file):
+        if self.MODEL_DIR in current_file:
+            pattern = re.sub(self.MODEL_DIR, self.model_test_dir, current_file)
+            pattern = re.sub(r'(\.\w+)$', '_%s\g<1>' % self.test_type, pattern)
+            return pattern
+        elif self.CONTROLLER_DIR in current_file:
+            pattern = re.sub(self.CONTROLLER_DIR, self.controller_test_dir, current_file)
+            pattern = re.sub(r'(\.\w+)$', '_%s\g<1>' % self.test_type, pattern)
+            return pattern
+        elif self.VIEW_DIR in current_file:
+            if self.test_type == 'spec':
+                # RSpec uses separate view specs
+                pattern = re.sub(self.VIEW_DIR, self.view_test_dir, current_file)
+                pattern = re.sub(r'(\w+)\.[\w\.]+$', r'\g<1>[\w\.]*_spec\.rb', pattern)
+            else:
+                # Test::Unit puts view tests in the controller test file
+                pattern = re.sub(self.VIEW_DIR, self.controller_test_dir, current_file)
+                pattern = re.sub(r'(\w+)%s[\w\.]+$' % os.sep, '\g<1>_controller_test.rb', pattern)
+            return pattern
+        elif self.HELPER_DIR in current_file:
+            pattern = re.sub(self.HELPER_DIR, self.helper_test_dir, current_file)
+            pattern = re.sub(r'\.rb$', r'_%s\.rb' % self.test_type, pattern)
+            return pattern
+        elif self.FIXTURE_DIR in current_file:
+            m = re.search(r'(\w+)\.yml$', current_file)
+            singular = Inflector().singularize(m.group(1))
+
+            pattern = re.sub(self.FIXTURE_DIR, r'(?:%s|%s)' % (self.model_test_dir, self.controller_test_dir), current_file)
+            pattern = re.sub(r'(\w+)\.yml$', r'(?:\g<1>_controller|%s)_%s\.rb' % (singular, self.test_type), pattern)
+            return pattern
+        elif 'config/routes.rb' in current_file and self.test_type == 'spec':
+            pattern = os.path.join(self.root, 'spec', 'routing', '.+_routing_spec.rb')
+            return pattern
+        else:
+            return None
+
+    def is_listing_current_file_group(self, current_file):
+        return os.path.join(self.root, self.test_type) in current_file and not self.FIXTURE_DIR in current_file
+
+
 class ListRailsJavascriptsCommand(RailsCommandBase):
     def run(self):
         if not self.setup():
